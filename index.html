@@ -98,7 +98,6 @@
             filter: drop-shadow(0 10px 30px rgba(251, 191, 36, 0.3));
         }
 
-        /* Hide scrollbar */
         ::-webkit-scrollbar {
             display: none;
         }
@@ -115,7 +114,7 @@
                 </div>
                 <div>
                     <div class="text-xs text-gray-400">Daromadingiz</div>
-                    <div class="text-lg font-bold" id="profitPerHour">+0/hour</div>
+                    <div class="text-lg font-bold" id="profitPerHour">+0/soat</div>
                 </div>
             </div>
             <div class="text-right">
@@ -208,8 +207,11 @@
                 Do'stni taklif qilish
             </button>
         </div>
-        <div id="friendsList">
-            <!-- Friends list -->
+        <div class="card rounded-2xl p-4">
+            <div class="text-center">
+                <div class="text-sm text-gray-400">Taklif qilingan do'stlar</div>
+                <div class="text-3xl font-bold text-yellow-400" id="friendsCount">0</div>
+            </div>
         </div>
     </div>
 
@@ -231,25 +233,25 @@
             boosts: JSON.parse(localStorage.getItem('boosts')) || [],
             completedTasks: JSON.parse(localStorage.getItem('completedTasks')) || [],
             friends: parseInt(localStorage.getItem('friends')) || 0,
-            lastSave: Date.now()
+            lastSave: parseInt(localStorage.getItem('lastSave')) || Date.now()
         };
 
         // Cards Data
         const cardsData = [
-            { id: 1, name: 'Bitcoin Miner', icon: '₿', cost: 100, profit: 100, level: 0, maxLevel: 10 },
-            { id: 2, name: 'Ethereum Node', icon: 'Ξ', cost: 500, profit: 400, level: 0, maxLevel: 10 },
-            { id: 3, name: 'Trading Bot', icon: '🤖', cost: 2000, profit: 1200, level: 0, maxLevel: 10 },
-            { id: 4, name: 'Crypto Farm', icon: '🏭', cost: 5000, profit: 3000, level: 0, maxLevel: 10 },
-            { id: 5, name: 'Blockchain VC', icon: '💼', cost: 10000, profit: 6000, level: 0, maxLevel: 10 },
-            { id: 6, name: 'DeFi Protocol', icon: '🏦', cost: 25000, profit: 12000, level: 0, maxLevel: 10 },
+            { id: 1, name: 'Bitcoin Miner', icon: '₿', cost: 100, profit: 100, maxLevel: 10 },
+            { id: 2, name: 'Ethereum Node', icon: 'Ξ', cost: 500, profit: 400, maxLevel: 10 },
+            { id: 3, name: 'Trading Bot', icon: '🤖', cost: 2000, profit: 1200, maxLevel: 10 },
+            { id: 4, name: 'Crypto Farm', icon: '🏭', cost: 5000, profit: 3000, maxLevel: 10 },
+            { id: 5, name: 'Blockchain VC', icon: '💼', cost: 10000, profit: 6000, maxLevel: 10 },
+            { id: 6, name: 'DeFi Protocol', icon: '🏦', cost: 25000, profit: 12000, maxLevel: 10 },
         ];
 
         // Boosts Data
         const boostsData = [
-            { id: 1, name: 'Multi-Tap', icon: '👆', cost: 1000, multiplier: 2, type: 'click', purchased: false },
-            { id: 2, name: 'Energy Limit', icon: '⚡', cost: 2000, multiplier: 500, type: 'energy', purchased: false },
-            { id: 3, name: 'Profit Boost', icon: '📈', cost: 5000, multiplier: 1.5, type: 'profit', purchased: false },
-            { id: 4, name: 'Auto Clicker', icon: '⏱️', cost: 10000, multiplier: 100, type: 'auto', purchased: false },
+            { id: 1, name: 'Multi-Tap', icon: '👆', cost: 1000, multiplier: 2, type: 'click', description: 'Click kuchini 2x oshiradi' },
+            { id: 2, name: 'Energy Limit', icon: '⚡', cost: 2000, multiplier: 500, type: 'energy', description: 'Energiya limitini +500 oshiradi' },
+            { id: 3, name: 'Profit Boost', icon: '📈', cost: 5000, multiplier: 2, type: 'profit', description: 'Daromadni 2x oshiradi' },
+            { id: 4, name: 'Auto Clicker', icon: '⏱️', cost: 10000, multiplier: 100, type: 'auto', description: 'Avtomatik 100/soat' },
         ];
 
         // Tasks Data
@@ -301,6 +303,11 @@
                 if (tg.HapticFeedback) {
                     tg.HapticFeedback.impactOccurred('light');
                 }
+            } else {
+                // Not enough energy
+                if (tg.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('error');
+                }
             }
         });
 
@@ -315,13 +322,24 @@
             setTimeout(() => el.remove(), 1000);
         }
 
+        // Get Card Level
+        function getCardLevel(cardId) {
+            const card = gameState.cards.find(c => c.id === cardId);
+            return card ? card.level : 0;
+        }
+
+        // Get Total Cards Count
+        function getTotalCardsCount() {
+            return gameState.cards.filter(c => c.level > 0).length;
+        }
+
         // Render Cards
         function renderCards() {
             const grid = document.getElementById('cardsGrid');
             grid.innerHTML = cardsData.map(card => {
-                const owned = gameState.cards.find(c => c.id === card.id);
-                const level = owned ? owned.level : 0;
+                const level = getCardLevel(card.id);
                 const currentCost = Math.floor(card.cost * Math.pow(1.15, level));
+                const canBuy = gameState.balance >= currentCost && level < card.maxLevel;
                 
                 return `
                     <div class="card rounded-2xl p-4 flex items-center gap-4 boost-card">
@@ -334,8 +352,8 @@
                             <div class="text-yellow-400 font-semibold">+${card.profit.toLocaleString()}/soat</div>
                         </div>
                         <button onclick="buyCard(${card.id})" 
-                                class="px-4 py-2 rounded-xl font-bold ${gameState.balance >= currentCost && level < card.maxLevel ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-black' : 'bg-gray-700 text-gray-500'}"
-                                ${gameState.balance < currentCost || level >= card.maxLevel ? 'disabled' : ''}>
+                                class="px-4 py-2 rounded-xl font-bold transition-all ${canBuy ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-black hover:scale-105' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}"
+                                ${!canBuy ? 'disabled' : ''}>
                             ${level >= card.maxLevel ? '✓' : currentCost.toLocaleString()}
                         </button>
                     </div>
@@ -346,36 +364,52 @@
         // Buy Card
         function buyCard(cardId) {
             const card = cardsData.find(c => c.id === cardId);
-            const owned = gameState.cards.find(c => c.id === cardId);
-            const level = owned ? owned.level : 0;
+            const level = getCardLevel(cardId);
             const cost = Math.floor(card.cost * Math.pow(1.15, level));
             
-            if (gameState.balance >= cost && level < card.maxLevel) {
-                gameState.balance -= cost;
-                
-                if (owned) {
-                    owned.level++;
-                } else {
-                    gameState.cards.push({ id: card.id, level: 1 });
-                }
-                
-                gameState.profitPerHour += card.profit;
-                updateLevel();
-                renderCards();
-                updateUI();
-                saveGame();
-                
-                if (tg.HapticFeedback) {
-                    tg.HapticFeedback.notificationOccurred('success');
-                }
+            if (level >= card.maxLevel) {
+                tg.showAlert('Bu karta maksimal darajada!');
+                return;
             }
+            
+            if (gameState.balance < cost) {
+                tg.showAlert('Yetarli mablag\' yo\'q!');
+                return;
+            }
+            
+            gameState.balance -= cost;
+            
+            const existingCard = gameState.cards.find(c => c.id === cardId);
+            if (existingCard) {
+                existingCard.level++;
+            } else {
+                gameState.cards.push({ id: cardId, level: 1 });
+            }
+            
+            gameState.profitPerHour += card.profit;
+            updateLevel();
+            renderCards();
+            updateUI();
+            saveGame();
+            
+            if (tg.HapticFeedback) {
+                tg.HapticFeedback.notificationOccurred('success');
+            }
+            
+            tg.showAlert(`${card.name} sotib olindi! +${card.profit}/soat`);
+        }
+
+        // Check if Boost is Purchased
+        function isBoostPurchased(boostId) {
+            return gameState.boosts.some(b => b.id === boostId && b.purchased);
         }
 
         // Render Boosts
         function renderBoosts() {
             const list = document.getElementById('boostsList');
             list.innerHTML = boostsData.map(boost => {
-                const purchased = gameState.boosts.find(b => b.id === boost.id);
+                const purchased = isBoostPurchased(boost.id);
+                const canBuy = gameState.balance >= boost.cost && !purchased;
                 
                 return `
                     <div class="card rounded-2xl p-4 flex items-center gap-4 boost-card">
@@ -384,16 +418,11 @@
                         </div>
                         <div class="flex-1">
                             <div class="font-bold text-lg">${boost.name}</div>
-                            <div class="text-sm text-gray-400">
-                                ${boost.type === 'click' && `Click kuchini ${boost.multiplier}x oshiradi`}
-                                ${boost.type === 'energy' && `Energiya limitini +${boost.multiplier} oshiradi`}
-                                ${boost.type === 'profit' && `Daromadni ${boost.multiplier}x oshiradi`}
-                                ${boost.type === 'auto' && `Avtomatik ${boost.multiplier}/soat`}
-                            </div>
+                            <div class="text-sm text-gray-400">${boost.description}</div>
                         </div>
                         <button onclick="buyBoost(${boost.id})" 
-                                class="px-4 py-2 rounded-xl font-bold ${gameState.balance >= boost.cost && !purchased ? 'bg-gradient-to-r from-purple-400 to-pink-500 text-white' : 'bg-gray-700 text-gray-500'}"
-                                ${gameState.balance < boost.cost || purchased ? 'disabled' : ''}>
+                                class="px-4 py-2 rounded-xl font-bold transition-all ${canBuy ? 'bg-gradient-to-r from-purple-400 to-pink-500 text-white hover:scale-105' : purchased ? 'bg-green-500/20 text-green-500 cursor-default' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}"
+                                ${!canBuy && !purchased ? 'disabled' : ''}>
                             ${purchased ? '✓' : boost.cost.toLocaleString()}
                         </button>
                     </div>
@@ -404,31 +433,40 @@
         // Buy Boost
         function buyBoost(boostId) {
             const boost = boostsData.find(b => b.id === boostId);
-            const purchased = gameState.boosts.find(b => b.id === boostId);
             
-            if (gameState.balance >= boost.cost && !purchased) {
-                gameState.balance -= boost.cost;
-                gameState.boosts.push({ id: boost.id, purchased: true });
-                
-                if (boost.type === 'click') {
-                    gameState.clickValue *= boost.multiplier;
-                } else if (boost.type === 'energy') {
-                    gameState.maxEnergy += boost.multiplier;
-                    gameState.energy = gameState.maxEnergy;
-                } else if (boost.type === 'profit') {
-                    gameState.profitPerHour = Math.floor(gameState.profitPerHour * boost.multiplier);
-                } else if (boost.type === 'auto') {
-                    gameState.profitPerHour += boost.multiplier;
-                }
-                
-                renderBoosts();
-                updateUI();
-                saveGame();
-                
-                if (tg.HapticFeedback) {
-                    tg.HapticFeedback.notificationOccurred('success');
-                }
+            if (isBoostPurchased(boostId)) {
+                tg.showAlert('Bu boost allaqachon sotib olingan!');
+                return;
             }
+            
+            if (gameState.balance < boost.cost) {
+                tg.showAlert('Yetarli mablag\' yo\'q!');
+                return;
+            }
+            
+            gameState.balance -= boost.cost;
+            gameState.boosts.push({ id: boost.id, purchased: true });
+            
+            if (boost.type === 'click') {
+                gameState.clickValue *= boost.multiplier;
+            } else if (boost.type === 'energy') {
+                gameState.maxEnergy += boost.multiplier;
+                gameState.energy = gameState.maxEnergy;
+            } else if (boost.type === 'profit') {
+                gameState.profitPerHour = Math.floor(gameState.profitPerHour * boost.multiplier);
+            } else if (boost.type === 'auto') {
+                gameState.profitPerHour += boost.multiplier;
+            }
+            
+            renderBoosts();
+            updateUI();
+            saveGame();
+            
+            if (tg.HapticFeedback) {
+                tg.HapticFeedback.notificationOccurred('success');
+            }
+            
+            tg.showAlert(`${boost.name} sotib olindi!`);
         }
 
         // Render Tasks
@@ -438,7 +476,7 @@
                 const completed = gameState.completedTasks.includes(task.id);
                 
                 return `
-                    <div class="card rounded-2xl p-4 flex items-center gap-4 task-card" onclick="completeTask(${task.id})">
+                    <div class="card rounded-2xl p-4 flex items-center gap-4 task-card ${completed ? 'opacity-60' : ''}" onclick="completeTask(${task.id})">
                         <div class="w-12 h-12 rounded-full ${completed ? 'bg-green-500' : 'bg-gradient-to-br from-blue-400 to-cyan-500'} flex items-center justify-center text-xl">
                             ${completed ? '✓' : '📋'}
                         </div>
@@ -455,20 +493,23 @@
         }
 
         // Complete Task
-        async function completeTask(taskId) {
+        function completeTask(taskId) {
             const task = tasksData.find(t => t.id === taskId);
             const completed = gameState.completedTasks.includes(taskId);
             
-            if (completed) return;
-            
-            // Check task requirements
-            if (task.type === 'friends' && gameState.friends < task.required) {
-                tg.showAlert(`${task.required} ta do'st taklif qilishingiz kerak!`);
+            if (completed) {
+                tg.showAlert('Bu vazifa allaqachon bajarilgan!');
                 return;
             }
             
-            if (task.type === 'cards' && gameState.cards.length < task.required) {
-                tg.showAlert(`${task.required} ta karta sotib olishingiz kerak!`);
+            // Check task requirements
+            if (task.type === 'friends' && gameState.friends < task.required) {
+                tg.showAlert(`${task.required} ta do'st taklif qilishingiz kerak! Hozircha: ${gameState.friends}`);
+                return;
+            }
+            
+            if (task.type === 'cards' && getTotalCardsCount() < task.required) {
+                tg.showAlert(`${task.required} ta karta sotib olishingiz kerak! Hozircha: ${getTotalCardsCount()}`);
                 return;
             }
             
@@ -476,31 +517,28 @@
             if (task.link) {
                 tg.openLink(task.link);
                 
-                // Wait and check (in real app, you'd verify via API)
+                // Simulate task completion after opening link
                 setTimeout(() => {
-                    gameState.balance += task.reward;
-                    gameState.completedTasks.push(taskId);
-                    renderTasks();
-                    updateUI();
-                    saveGame();
-                    
-                    if (tg.HapticFeedback) {
-                        tg.HapticFeedback.notificationOccurred('success');
-                    }
-                    
-                    tg.showAlert(`Vazifa bajarildi! +${task.reward.toLocaleString()} 🎉`);
+                    completeTaskLogic(task);
                 }, 3000);
             } else {
-                gameState.balance += task.reward;
-                gameState.completedTasks.push(taskId);
-                renderTasks();
-                updateUI();
-                saveGame();
-                
-                if (tg.HapticFeedback) {
-                    tg.HapticFeedback.notificationOccurred('success');
-                }
+                completeTaskLogic(task);
             }
+        }
+
+        // Complete Task Logic
+        function completeTaskLogic(task) {
+            gameState.balance += task.reward;
+            gameState.completedTasks.push(task.id);
+            renderTasks();
+            updateUI();
+            saveGame();
+            
+            if (tg.HapticFeedback) {
+                tg.HapticFeedback.notificationOccurred('success');
+            }
+            
+            tg.showAlert(`Vazifa bajarildi! +${task.reward.toLocaleString()} 🎉`);
         }
 
         // Tab Switching
@@ -533,6 +571,7 @@
             tg.openLink(link);
             
             // In real app, track invites via backend
+            // For demo, we'll increment after a delay
             setTimeout(() => {
                 gameState.friends++;
                 gameState.balance += 10000;
@@ -540,16 +579,17 @@
                 updateUI();
                 saveGame();
                 tg.showAlert("Do'stingiz taklif qilindi! +10,000 🎉");
-            }, 2000);
+            }, 3000);
         }
 
         // Update UI
         function updateUI() {
             document.getElementById('balance').textContent = gameState.balance.toLocaleString();
-            document.getElementById('energy').textContent = gameState.energy;
+            document.getElementById('energy').textContent = Math.floor(gameState.energy);
             document.getElementById('maxEnergy').textContent = gameState.maxEnergy;
-            document.getElementById('profitPerHour').textContent = '+' + gameState.profitPerHour.toLocaleString() + '/hour';
+            document.getElementById('profitPerHour').textContent = '+' + gameState.profitPerHour.toLocaleString() + '/soat';
             document.getElementById('levelDisplay').textContent = gameState.level;
+            document.getElementById('friendsCount').textContent = gameState.friends;
             
             const energyPercent = (gameState.energy / gameState.maxEnergy) * 100;
             document.getElementById('energyBar').style.width = energyPercent + '%';
@@ -591,6 +631,7 @@
             localStorage.setItem('cards', JSON.stringify(gameState.cards));
             localStorage.setItem('boosts', JSON.stringify(gameState.boosts));
             localStorage.setItem('completedTasks', JSON.stringify(gameState.completedTasks));
+            localStorage.setItem('friends', gameState.friends);
             localStorage.setItem('lastSave', Date.now());
         }
 
@@ -600,9 +641,11 @@
             const offlineTime = (Date.now() - lastSave) / 1000 / 3600; // hours
             const profit = gameState.profitPerHour * offlineTime;
             
-            if (profit > 0) {
-                gameState.balance += Math.floor(profit);
-                tg.showAlert(`G'oyib bo'lganingizda ${Math.floor(profit).toLocaleString()} coin ishlab topdingiz!`);
+            if (profit > 0 && offlineTime < 24) { // Max 24 hours offline
+                const earned = Math.floor(profit);
+                gameState.balance += earned;
+                saveGame();
+                tg.showAlert(`G'oyib bo'lganingizda ${earned.toLocaleString()} coin ishlab topdingiz!`);
             }
         }
 
