@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hamster Combat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        
+        body {
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .coin-button {
+            background: radial-gradient(circle, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+            box-shadow: 0 10px 40px rgba(251, 191, 36, 0.4), 
+                        inset 0 -5px 20px rgba(0,0,0,0.2),
+                        inset 0 5px 20px rgba(255,255,255,0.3);
+            transition: transform 0.1s;
+        }
+
+        .coin-button:active {
+            transform: scale(0.95);
+        }
+
+        .click-animation {
+            position: absolute;
+            pointer-events: none;
+            animation: floatUp 1s ease-out forwards;
+            font-weight: 700;
+            color: #fbbf24;
+            text-shadow: 0 0 10px rgba(251, 191, 36, 0.8);
+        }
+
+        @keyframes floatUp {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-100px) scale(1.5);
+            }
+        }
+
+        .energy-bar {
+            background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
+            transition: width 0.3s;
+        }
+
+        .tab-active {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: #1a1a2e;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .boost-card {
+            transition: all 0.3s;
+        }
+
+        .boost-card:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .task-card {
+            transition: all 0.3s;
+        }
+
+        .task-card:active {
+            transform: scale(0.98);
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .hamster-img {
+            filter: drop-shadow(0 10px 30px rgba(251, 191, 36, 0.3));
+        }
+
+        /* Hide scrollbar */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body class="text-white h-screen w-screen flex flex-col">
+
+    <!-- Header -->
+    <div class="px-4 pt-4 pb-2">
+        <div class="flex justify-between items-center mb-4">
+            <div class="flex items-center gap-2">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center font-bold text-lg">
+                    🐹
+                </div>
+                <div>
+                    <div class="text-xs text-gray-400">Daromadingiz</div>
+                    <div class="text-lg font-bold" id="profitPerHour">+0/hour</div>
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="text-xs text-gray-400">Daraja</div>
+                <div class="text-lg font-bold" id="levelDisplay">Bronze</div>
+            </div>
+        </div>
+
+        <!-- Balance -->
+        <div class="text-center py-4">
+            <div class="text-5xl font-bold mb-2 flex items-center justify-center gap-2">
+                <span id="balance">0</span>
+                <span class="text-3xl">💰</span>
+            </div>
+            <div class="text-sm text-gray-400">Hamster Coin</div>
+        </div>
+    </div>
+
+    <!-- Main Click Area -->
+    <div class="flex-1 flex items-center justify-center relative" id="clickArea">
+        <button class="coin-button w-64 h-64 rounded-full flex items-center justify-center pulse relative overflow-hidden" id="clickBtn">
+            <div class="text-8xl hamster-img">🐹</div>
+            <div class="absolute inset-0 rounded-full bg-gradient-to-t from-black/20 to-transparent"></div>
+        </button>
+    </div>
+
+    <!-- Energy Bar -->
+    <div class="px-6 pb-4">
+        <div class="flex justify-between text-sm mb-2">
+            <span class="text-gray-400">⚡ Energiya</span>
+            <span class="font-bold"><span id="energy">1000</span>/<span id="maxEnergy">1000</span></span>
+        </div>
+        <div class="h-3 bg-gray-700 rounded-full overflow-hidden">
+            <div class="energy-bar h-full rounded-full" id="energyBar" style="width: 100%"></div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="px-4 pb-4">
+        <div class="flex gap-2 bg-black/30 rounded-2xl p-1">
+            <button class="flex-1 py-3 rounded-xl font-semibold text-sm tab-active transition-all" data-tab="exchange" onclick="switchTab('exchange')">
+                📊 Birja
+            </button>
+            <button class="flex-1 py-3 rounded-xl font-semibold text-sm text-gray-400 transition-all" data-tab="boost" onclick="switchTab('boost')">
+                🚀 Boost
+            </button>
+            <button class="flex-1 py-3 rounded-xl font-semibold text-sm text-gray-400 transition-all" data-tab="tasks" onclick="switchTab('tasks')">
+                ✅ Vazifalar
+            </button>
+            <button class="flex-1 py-3 rounded-xl font-semibold text-sm text-gray-400 transition-all" data-tab="friends" onclick="switchTab('friends')">
+                👥 Do'stlar
+            </button>
+        </div>
+    </div>
+
+    <!-- Exchange Tab -->
+    <div id="exchangeTab" class="flex-1 overflow-y-auto px-4 pb-24">
+        <h2 class="text-xl font-bold mb-4">Kartalarni sotib oling</h2>
+        <div class="grid gap-3" id="cardsGrid">
+            <!-- Cards will be generated by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Boost Tab -->
+    <div id="boostTab" class="hidden flex-1 overflow-y-auto px-4 pb-24">
+        <h2 class="text-xl font-bold mb-4">Boostlar</h2>
+        <div class="space-y-3" id="boostsList">
+            <!-- Boosts will be generated by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Tasks Tab -->
+    <div id="tasksTab" class="hidden flex-1 overflow-y-auto px-4 pb-24">
+        <h2 class="text-xl font-bold mb-4">Vazifalar</h2>
+        <div class="space-y-3" id="tasksList">
+            <!-- Tasks will be generated by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Friends Tab -->
+    <div id="friendsTab" class="hidden flex-1 overflow-y-auto px-4 pb-24">
+        <h2 class="text-xl font-bold mb-4">Do'stlaringizni taklif qiling</h2>
+        <div class="card rounded-2xl p-4 mb-4">
+            <div class="text-center mb-4">
+                <div class="text-4xl mb-2">👥</div>
+                <div class="text-sm text-gray-400">Har bir do'stingiz uchun</div>
+                <div class="text-2xl font-bold text-yellow-400">+10,000</div>
+            </div>
+            <button class="w-full py-3 rounded-xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 text-black" onclick="inviteFriend()">
+                Do'stni taklif qilish
+            </button>
+        </div>
+        <div id="friendsList">
+            <!-- Friends list -->
+        </div>
+    </div>
+
+    <script>
+        // Initialize Telegram Web App
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        // Game State
+        let gameState = {
+            balance: parseInt(localStorage.getItem('balance')) || 0,
+            energy: parseInt(localStorage.getItem('energy')) || 1000,
+            maxEnergy: parseInt(localStorage.getItem('maxEnergy')) || 1000,
+            profitPerHour: parseInt(localStorage.getItem('profitPerHour')) || 0,
+            clickValue: parseInt(localStorage.getItem('clickValue')) || 1,
+            level: localStorage.getItem('level') || 'Bronze',
+            cards: JSON.parse(localStorage.getItem('cards')) || [],
+            boosts: JSON.parse(localStorage.getItem('boosts')) || [],
+            completedTasks: JSON.parse(localStorage.getItem('completedTasks')) || [],
+            friends: parseInt(localStorage.getItem('friends')) || 0,
+            lastSave: Date.now()
+        };
+
+        // Cards Data
+        const cardsData = [
+            { id: 1, name: 'Bitcoin Miner', icon: '₿', cost: 100, profit: 100, level: 0, maxLevel: 10 },
+            { id: 2, name: 'Ethereum Node', icon: 'Ξ', cost: 500, profit: 400, level: 0, maxLevel: 10 },
+            { id: 3, name: 'Trading Bot', icon: '🤖', cost: 2000, profit: 1200, level: 0, maxLevel: 10 },
+            { id: 4, name: 'Crypto Farm', icon: '🏭', cost: 5000, profit: 3000, level: 0, maxLevel: 10 },
+            { id: 5, name: 'Blockchain VC', icon: '💼', cost: 10000, profit: 6000, level: 0, maxLevel: 10 },
+            { id: 6, name: 'DeFi Protocol', icon: '🏦', cost: 25000, profit: 12000, level: 0, maxLevel: 10 },
+        ];
+
+        // Boosts Data
+        const boostsData = [
+            { id: 1, name: 'Multi-Tap', icon: '👆', cost: 1000, multiplier: 2, type: 'click', purchased: false },
+            { id: 2, name: 'Energy Limit', icon: '⚡', cost: 2000, multiplier: 500, type: 'energy', purchased: false },
+            { id: 3, name: 'Profit Boost', icon: '📈', cost: 5000, multiplier: 1.5, type: 'profit', purchased: false },
+            { id: 4, name: 'Auto Clicker', icon: '⏱️', cost: 10000, multiplier: 100, type: 'auto', purchased: false },
+        ];
+
+        // Tasks Data
+        const tasksData = [
+            { id: 1, title: 'Telegram kanalga obuna bo\'ling', reward: 5000, link: 'https://t.me/hamster_kombat', completed: false },
+            { id: 2, title: 'Twitter\'da follow qiling', reward: 5000, link: 'https://twitter.com/hamster_kombat', completed: false },
+            { id: 3, title: 'YouTube kanalga obuna bo\'ling', reward: 10000, link: 'https://youtube.com', completed: false },
+            { id: 4, title: 'Discord serverga qo\'shiling', reward: 10000, link: 'https://discord.gg', completed: false },
+            { id: 5, title: '3 do\'stingizni taklif qiling', reward: 15000, type: 'friends', required: 3, completed: false },
+            { id: 6, title: 'Birjadan 5 ta karta sotib oling', reward: 20000, type: 'cards', required: 5, completed: false },
+        ];
+
+        // Levels
+        const levels = [
+            { name: 'Bronze', minProfit: 0 },
+            { name: 'Silver', minProfit: 1000 },
+            { name: 'Gold', minProfit: 5000 },
+            { name: 'Platinum', minProfit: 15000 },
+            { name: 'Diamond', minProfit: 50000 },
+            { name: 'Master', minProfit: 100000 },
+            { name: 'Legend', minProfit: 500000 },
+        ];
+
+        // Initialize
+        function init() {
+            calculateOfflineEarnings();
+            renderCards();
+            renderBoosts();
+            renderTasks();
+            updateUI();
+            startEnergyRegen();
+            startAutoSave();
+        }
+
+        // Click Handler
+        document.getElementById('clickBtn').addEventListener('click', function(e) {
+            if (gameState.energy >= gameState.clickValue) {
+                const rect = this.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                gameState.balance += gameState.clickValue;
+                gameState.energy -= gameState.clickValue;
+                
+                showClickAnimation(x, y, `+${gameState.clickValue}`);
+                updateUI();
+                
+                // Haptic feedback
+                if (tg.HapticFeedback) {
+                    tg.HapticFeedback.impactOccurred('light');
+                }
+            }
+        });
+
+        // Show Click Animation
+        function showClickAnimation(x, y, text) {
+            const el = document.createElement('div');
+            el.className = 'click-animation absolute text-2xl';
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            el.textContent = text;
+            document.getElementById('clickArea').appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        }
+
+        // Render Cards
+        function renderCards() {
+            const grid = document.getElementById('cardsGrid');
+            grid.innerHTML = cardsData.map(card => {
+                const owned = gameState.cards.find(c => c.id === card.id);
+                const level = owned ? owned.level : 0;
+                const currentCost = Math.floor(card.cost * Math.pow(1.15, level));
+                
+                return `
+                    <div class="card rounded-2xl p-4 flex items-center gap-4 boost-card">
+                        <div class="w-16 h-16 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-3xl font-bold text-black">
+                            ${card.icon}
+                        </div>
+                        <div class="flex-1">
+                            <div class="font-bold text-lg">${card.name}</div>
+                            <div class="text-sm text-gray-400">Daraja ${level}/${card.maxLevel}</div>
+                            <div class="text-yellow-400 font-semibold">+${card.profit.toLocaleString()}/soat</div>
+                        </div>
+                        <button onclick="buyCard(${card.id})" 
+                                class="px-4 py-2 rounded-xl font-bold ${gameState.balance >= currentCost && level < card.maxLevel ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-black' : 'bg-gray-700 text-gray-500'}"
+                                ${gameState.balance < currentCost || level >= card.maxLevel ? 'disabled' : ''}>
+                            ${level >= card.maxLevel ? '✓' : currentCost.toLocaleString()}
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Buy Card
+        function buyCard(cardId) {
+            const card = cardsData.find(c => c.id === cardId);
+            const owned = gameState.cards.find(c => c.id === cardId);
+            const level = owned ? owned.level : 0;
+            const cost = Math.floor(card.cost * Math.pow(1.15, level));
+            
+            if (gameState.balance >= cost && level < card.maxLevel) {
+                gameState.balance -= cost;
+                
+                if (owned) {
+                    owned.level++;
+                } else {
+                    gameState.cards.push({ id: card.id, level: 1 });
+                }
+                
+                gameState.profitPerHour += card.profit;
+                updateLevel();
+                renderCards();
+                updateUI();
+                saveGame();
+                
+                if (tg.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('success');
+                }
+            }
+        }
+
+        // Render Boosts
+        function renderBoosts() {
+            const list = document.getElementById('boostsList');
+            list.innerHTML = boostsData.map(boost => {
+                const purchased = gameState.boosts.find(b => b.id === boost.id);
+                
+                return `
+                    <div class="card rounded-2xl p-4 flex items-center gap-4 boost-card">
+                        <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-2xl">
+                            ${boost.icon}
+                        </div>
+                        <div class="flex-1">
+                            <div class="font-bold text-lg">${boost.name}</div>
+                            <div class="text-sm text-gray-400">
+                                ${boost.type === 'click' && `Click kuchini ${boost.multiplier}x oshiradi`}
+                                ${boost.type === 'energy' && `Energiya limitini +${boost.multiplier} oshiradi`}
+                                ${boost.type === 'profit' && `Daromadni ${boost.multiplier}x oshiradi`}
+                                ${boost.type === 'auto' && `Avtomatik ${boost.multiplier}/soat`}
+                            </div>
+                        </div>
+                        <button onclick="buyBoost(${boost.id})" 
+                                class="px-4 py-2 rounded-xl font-bold ${gameState.balance >= boost.cost && !purchased ? 'bg-gradient-to-r from-purple-400 to-pink-500 text-white' : 'bg-gray-700 text-gray-500'}"
+                                ${gameState.balance < boost.cost || purchased ? 'disabled' : ''}>
+                            ${purchased ? '✓' : boost.cost.toLocaleString()}
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Buy Boost
+        function buyBoost(boostId) {
+            const boost = boostsData.find(b => b.id === boostId);
+            const purchased = gameState.boosts.find(b => b.id === boostId);
+            
+            if (gameState.balance >= boost.cost && !purchased) {
+                gameState.balance -= boost.cost;
+                gameState.boosts.push({ id: boost.id, purchased: true });
+                
+                if (boost.type === 'click') {
+                    gameState.clickValue *= boost.multiplier;
+                } else if (boost.type === 'energy') {
+                    gameState.maxEnergy += boost.multiplier;
+                    gameState.energy = gameState.maxEnergy;
+                } else if (boost.type === 'profit') {
+                    gameState.profitPerHour = Math.floor(gameState.profitPerHour * boost.multiplier);
+                } else if (boost.type === 'auto') {
+                    gameState.profitPerHour += boost.multiplier;
+                }
+                
+                renderBoosts();
+                updateUI();
+                saveGame();
+                
+                if (tg.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('success');
+                }
+            }
+        }
+
+        // Render Tasks
+        function renderTasks() {
+            const list = document.getElementById('tasksList');
+            list.innerHTML = tasksData.map(task => {
+                const completed = gameState.completedTasks.includes(task.id);
+                
+                return `
+                    <div class="card rounded-2xl p-4 flex items-center gap-4 task-card" onclick="completeTask(${task.id})">
+                        <div class="w-12 h-12 rounded-full ${completed ? 'bg-green-500' : 'bg-gradient-to-br from-blue-400 to-cyan-500'} flex items-center justify-center text-xl">
+                            ${completed ? '✓' : '📋'}
+                        </div>
+                        <div class="flex-1">
+                            <div class="font-bold ${completed ? 'text-gray-500 line-through' : ''}">${task.title}</div>
+                            <div class="text-yellow-400 font-semibold">+${task.reward.toLocaleString()}</div>
+                        </div>
+                        <button class="px-4 py-2 rounded-xl font-bold ${completed ? 'bg-green-500/20 text-green-500' : 'bg-gradient-to-r from-blue-400 to-cyan-500 text-white'}">
+                            ${completed ? 'Bajarildi' : 'Bajarish'}
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Complete Task
+        async function completeTask(taskId) {
+            const task = tasksData.find(t => t.id === taskId);
+            const completed = gameState.completedTasks.includes(taskId);
+            
+            if (completed) return;
+            
+            // Check task requirements
+            if (task.type === 'friends' && gameState.friends < task.required) {
+                tg.showAlert(`${task.required} ta do'st taklif qilishingiz kerak!`);
+                return;
+            }
+            
+            if (task.type === 'cards' && gameState.cards.length < task.required) {
+                tg.showAlert(`${task.required} ta karta sotib olishingiz kerak!`);
+                return;
+            }
+            
+            // Open link for external tasks
+            if (task.link) {
+                tg.openLink(task.link);
+                
+                // Wait and check (in real app, you'd verify via API)
+                setTimeout(() => {
+                    gameState.balance += task.reward;
+                    gameState.completedTasks.push(taskId);
+                    renderTasks();
+                    updateUI();
+                    saveGame();
+                    
+                    if (tg.HapticFeedback) {
+                        tg.HapticFeedback.notificationOccurred('success');
+                    }
+                    
+                    tg.showAlert(`Vazifa bajarildi! +${task.reward.toLocaleString()} 🎉`);
+                }, 3000);
+            } else {
+                gameState.balance += task.reward;
+                gameState.completedTasks.push(taskId);
+                renderTasks();
+                updateUI();
+                saveGame();
+                
+                if (tg.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('success');
+                }
+            }
+        }
+
+        // Tab Switching
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.getElementById('exchangeTab').classList.add('hidden');
+            document.getElementById('boostTab').classList.add('hidden');
+            document.getElementById('tasksTab').classList.add('hidden');
+            document.getElementById('friendsTab').classList.add('hidden');
+            
+            // Reset all tab buttons
+            document.querySelectorAll('[data-tab]').forEach(btn => {
+                btn.classList.remove('tab-active');
+                btn.classList.add('text-gray-400');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').classList.remove('hidden');
+            
+            // Activate button
+            const activeBtn = document.querySelector(`[data-tab="${tabName}"]`);
+            activeBtn.classList.add('tab-active');
+            activeBtn.classList.remove('text-gray-400');
+        }
+
+        // Invite Friend
+        function inviteFriend() {
+            const shareText = "Men bilan Hamster Combat o'yinini o'yna! 10,000 coin olasiz!";
+            const link = "https://t.me/share/url?url=https://t.me/your_bot&text=" + encodeURIComponent(shareText);
+            tg.openLink(link);
+            
+            // In real app, track invites via backend
+            setTimeout(() => {
+                gameState.friends++;
+                gameState.balance += 10000;
+                localStorage.setItem('friends', gameState.friends);
+                updateUI();
+                saveGame();
+                tg.showAlert("Do'stingiz taklif qilindi! +10,000 🎉");
+            }, 2000);
+        }
+
+        // Update UI
+        function updateUI() {
+            document.getElementById('balance').textContent = gameState.balance.toLocaleString();
+            document.getElementById('energy').textContent = gameState.energy;
+            document.getElementById('maxEnergy').textContent = gameState.maxEnergy;
+            document.getElementById('profitPerHour').textContent = '+' + gameState.profitPerHour.toLocaleString() + '/hour';
+            document.getElementById('levelDisplay').textContent = gameState.level;
+            
+            const energyPercent = (gameState.energy / gameState.maxEnergy) * 100;
+            document.getElementById('energyBar').style.width = energyPercent + '%';
+        }
+
+        // Update Level
+        function updateLevel() {
+            for (let i = levels.length - 1; i >= 0; i--) {
+                if (gameState.profitPerHour >= levels[i].minProfit) {
+                    gameState.level = levels[i].name;
+                    break;
+                }
+            }
+        }
+
+        // Energy Regeneration
+        function startEnergyRegen() {
+            setInterval(() => {
+                if (gameState.energy < gameState.maxEnergy) {
+                    gameState.energy = Math.min(gameState.energy + 3, gameState.maxEnergy);
+                    updateUI();
+                }
+            }, 1000);
+        }
+
+        // Auto Save
+        function startAutoSave() {
+            setInterval(saveGame, 5000);
+        }
+
+        // Save Game
+        function saveGame() {
+            localStorage.setItem('balance', gameState.balance);
+            localStorage.setItem('energy', gameState.energy);
+            localStorage.setItem('maxEnergy', gameState.maxEnergy);
+            localStorage.setItem('profitPerHour', gameState.profitPerHour);
+            localStorage.setItem('clickValue', gameState.clickValue);
+            localStorage.setItem('level', gameState.level);
+            localStorage.setItem('cards', JSON.stringify(gameState.cards));
+            localStorage.setItem('boosts', JSON.stringify(gameState.boosts));
+            localStorage.setItem('completedTasks', JSON.stringify(gameState.completedTasks));
+            localStorage.setItem('lastSave', Date.now());
+        }
+
+        // Calculate Offline Earnings
+        function calculateOfflineEarnings() {
+            const lastSave = parseInt(localStorage.getItem('lastSave')) || Date.now();
+            const offlineTime = (Date.now() - lastSave) / 1000 / 3600; // hours
+            const profit = gameState.profitPerHour * offlineTime;
+            
+            if (profit > 0) {
+                gameState.balance += Math.floor(profit);
+                tg.showAlert(`G'oyib bo'lganingizda ${Math.floor(profit).toLocaleString()} coin ishlab topdingiz!`);
+            }
+        }
+
+        // Initialize game
+        init();
+
+        // Prevent zoom on double tap
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function(event) {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+    </script>
+</body>
+</html>
